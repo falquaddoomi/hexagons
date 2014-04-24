@@ -7,7 +7,8 @@ import domain.board.HexCoord;
 */
 public abstract class Entity {
     protected boolean isAlive = true;
-    public HexCoord coord;
+    public HexCoord coord, dest;
+    public int energy = 0, max_energy = 100;
     public long id;
     public long ownerid = -1;
 
@@ -19,7 +20,8 @@ public abstract class Entity {
 
     public void sync(Entity delta) {
         this.coord = delta.coord;
-        this.id = delta.id;
+        this.energy = delta.energy;
+        this.id = delta.id; // FIXME: should we really be syncing the id?
         this.ownerid = delta.ownerid;
     }
 }

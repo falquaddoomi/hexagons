@@ -8,11 +8,14 @@ import domain.board.HexRegion;
 import domain.effects.Effect;
 import domain.entities.Entity;
 import domain.entities.EntityList;
+import domain.entities.Pylon;
 import domain.entities.Worker;
-import exchanges.MoveRequest;
+import entrypoint.HexagonApp;
+import exchanges.*;
 import framework.WorldView;
 import framework.faces.board.HexMapRenderer;
 import framework.faces.entities.EntityRenderer;
+import framework.faces.entities.PylonRenderer;
 import framework.faces.entities.WorkerRenderer;
 import notifies.EntDeathNotifyList;
 import support.Registry;
@@ -24,10 +27,12 @@ import java.util.ArrayList;
  * created by Faisal on 3/5/14 4:42 PM
  */
 public class HexClient extends Listener {
+    private final HexagonApp state;
     private Client client;
     private final WorldView worldview;
 
-    public HexClient(WorldView worldview) {
+    public HexClient(HexagonApp state, WorldView worldview) {
+        this.state = state;
         this.worldview = worldview;
 
         try {
@@ -51,7 +56,7 @@ public class HexClient extends Listener {
         // dispatch based on detected object type
         if (o instanceof HexRegion) {
             HexRegion region = (HexRegion)o;
-            System.out.printf("Received region of size %d!\n", region.region.size());
+            // System.out.printf("Received region of size %d!\n", region.region.size());
             // add everything in the HexRegion to our render cache
             worldview.addRegion(region);
         }
@@ -62,7 +67,7 @@ public class HexClient extends Listener {
             }
         }
         else if (o instanceof EntityList) {
-            System.out.printf("Got entity update notification\n");
+            // System.out.printf("Got entity update notification\n");
 
             // unpack the entities into the worldview
             synchronized (worldview.entities) {
@@ -70,13 +75,16 @@ public class HexClient extends Listener {
                     // iterate through every entity in the update/create list
 
                     if (worldview.entities.containsKey(e.getId())) {
-                        // since we already contain it, update just the backed instance
+                        // since we already contain it, just update the backed instance
                         worldview.entities.get(e.getId()).get().sync(e);
                     }
                     else {
                         // it's a new entity, wrap it in an appropriate face
                         if (e instanceof Worker)
                             worldview.entities.put(e.getId(), new WorkerRenderer((Worker)e, worldview.state));
+                        else if (e instanceof Pylon)
+                            worldview.entities.put(e.getId(), new PylonRenderer((Pylon) e, worldview.state));
+
                         // we ignore entities for which we don't have faces
                         System.out.printf("Added entity %d to list!\n", e.getId());
                     }
@@ -101,6 +109,30 @@ public class HexClient extends Listener {
                         worldview.entities.remove(dead_id);
                     }
                 }
+            }
+        }
+        else if (o instanceof PlayerLoginRequest) {
+            // server wants our login info; send it!
+            long lastID = state.prefs.getLong("last_ID", -1);
+            PlayerLoginResponse response = new PlayerLoginResponse();
+            response.playerID = lastID;
+
+            System.out.format("Attempting login as %d\n", lastID);
+
+            connection.sendTCP(response);
+        }
+        else if (o instanceof PlayerWelcomeResponse) {
+            // store the server's ID for us in our prefs
+            PlayerWelcomeResponse response = (PlayerWelcomeResponse)o;
+            state.prefs.putLong("last_ID", response.playerID);
+
+            System.out.format("Logged in as ID %d\n", response.playerID);
+        }
+        else if (o instanceof CameraPanRequest) {
+            CameraPanRequest request = (CameraPanRequest)o;
+
+            synchronized (state.cam) {
+                state.cam.destFocus = HexMapRenderer.getPixelForHexCoord(request.newLocation);
             }
         }
     }

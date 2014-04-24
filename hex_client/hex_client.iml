@@ -12,6 +12,7 @@
     <orderEntry type="library" name="core" level="project" />
     <orderEntry type="library" name="kryonet-2.21-all" level="project" />
     <orderEntry type="library" name="guava-16.0.1" level="project" />
+    <orderEntry type="library" name="controlP5" level="project" />
   </component>
 </module>
 

@@ -2,7 +2,10 @@ package domain.board;
 
 import processing.core.PApplet;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
 
 /**
 * created by Faisal on 3/5/14 2:03 PM
@@ -41,12 +44,19 @@ public class HexMap {
         return region;
     }
 
+    public HexCoord getRandomTileCoord() {
+        Random random = new Random();
+        List<HexCoord> keys = new ArrayList<HexCoord>(map.keySet());
+        return keys.get(random.nextInt(keys.size()));
+    }
+
     public HexTile get(int x, int y, int z) {
         return map.get(new HexCoord(x, y, z));
     }
+    public HexTile get(HexCoord c) { return map.get(c); }
 
     public static int hexDist(HexCoord a, HexCoord b) {
-        return PApplet.max(PApplet.abs(a.x - b.x), PApplet.abs(a.y - b.y), PApplet.abs(a.z - b.z));
+        return a.hexDist(b);
     }
 
     public static int hexDistFromOrigin(HexCoord a) {

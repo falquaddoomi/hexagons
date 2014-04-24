@@ -3,12 +3,11 @@ package framework.faces.board;
 import domain.board.HexCoord;
 import domain.board.HexMap;
 import domain.board.HexTile;
-import entrypoint.hexagon_maps;
+import entrypoint.HexagonApp;
 import framework.faces.RenderFace;
 import processing.core.PApplet;
 import processing.core.PConstants;
 import processing.core.PVector;
-import support.Face;
 
 import java.util.Map;
 
@@ -19,10 +18,13 @@ public class HexMapRenderer extends RenderFace<HexMap> {
     public static int TILE_SIZE = 24, OFFSET = 2;
     private HexCoord selection = null;
 
-    public HexMapRenderer(hexagon_maps state, HexMap target) {
+    public HexMapRenderer(HexagonApp state, HexMap target) {
         super(target, state);
     }
 
+    /***
+     * Draws the entire map, centered at the origin.
+     */
     public void draw() {
         // iterate through the hashmap and draw everything that's been allocated
         for (Map.Entry entry : wrapped.map.entrySet()) {
@@ -31,12 +33,17 @@ public class HexMapRenderer extends RenderFace<HexMap> {
         }
     }
 
+    /***
+     * Draws a given HexTile at its HexCoord on the screen.
+     * @param t the HexTile to draw.
+     */
     public void drawHexagon(HexTile t) {
         // nab the location first
         HexCoord c = t.coord;
         PVector loc = getPixelForHexCoord(c);
 
         // cull hexagons that are outside the viewport
+        // FIXME: should handle board scaling
         PVector transformed = PVector.add(loc, state.cam.focus);
         if (transformed.x < -TILE_SIZE || transformed.x > state.width+TILE_SIZE || transformed.y < -TILE_SIZE || transformed.y > state.height+TILE_SIZE)
             return;
@@ -82,6 +89,11 @@ public class HexMapRenderer extends RenderFace<HexMap> {
         state.popMatrix();
     }
 
+    /***
+     * Returns a PVector of the pixel coordinates of the center of the given HexCoord.
+     * @param c the HexCoord for which to retrieve the pixel coordinates
+     * @return a PVector consisting of the pixel coordinates
+     */
     public static PVector getPixelForHexCoord(HexCoord c) {
         // convert hex coords to pixel coords
         int q = c.x + (c.z - (c.z&1)) / 2, r = c.z;
@@ -91,12 +103,16 @@ public class HexMapRenderer extends RenderFace<HexMap> {
         return new PVector(cx, cy);
     }
 
+    /***
+     * Returns the HexCoord corresponding to the pixel coordinate.
+     * @param x the x component of the pixel coordinate
+     * @param y the y component of the pixel coordinate
+     * @return the HexCoord corresponding to the pixel coordinate
+     */
     public static HexCoord getHexCoordForPixel(float x, float y) {
         // compute axial coords from x, y pixel coords
         float q = ((1.0f/3.0f)*(float)Math.sqrt(3.0f) * x - (1.0f/3.0f) * y) / (float)TILE_SIZE;
         float r = (2.0f/3.0f) * y / (float)TILE_SIZE;
-
-        PApplet.println("Axial: " + q + ", " + r);
 
         // convert axial coords to x, y, z
         float tx = q;
@@ -106,20 +122,35 @@ public class HexMapRenderer extends RenderFace<HexMap> {
         // create a hex coordinate then round it to the hex grid
         HexCoord c = roundHexCoord(tx, ty, tz);
 
-        PApplet.println("Coords: " + c.x + ", " + c.y + ", " + c.z);
-
         // and then make a hexcoord like that?
         return c;
     }
 
+    /***
+     * Gets the selected HexCoord, or null if nothing is selected.
+     * @return the selected HexCoord, or null if no selection exists.
+     */
     public HexCoord getSelection() {
         return selection;
     }
 
+    /***
+     * Sets the given HexCoord as the selection.
+     *
+     * Also displays a selection reticule around the corresponding map tile, if it exists.
+     * @param selection the HexCoord to select
+     */
     public void setSelection(HexCoord selection) {
         this.selection = selection;
     }
 
+    /***
+     * Takes a fractional set of 3-axis coords and discretizes them.
+     * @param cx x-coordinate in the 3-axis space
+     * @param cy y-coordinate in the 3-axis space
+     * @param cz z-coordinate in the 3-axis space
+     * @return a HexCoord containing the discretized location in the grid
+     */
     public static HexCoord roundHexCoord(float cx, float cy, float cz) {
         int rx = PApplet.round(cx);
         int ry = PApplet.round(cy);

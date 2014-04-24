@@ -4,8 +4,7 @@ import domain.board.HexCoord;
 import domain.board.HexMap;
 import domain.board.HexRegion;
 import domain.effects.Effect;
-import domain.entities.Entity;
-import entrypoint.hexagon_maps;
+import entrypoint.HexagonApp;
 import framework.faces.board.HexMapRenderer;
 import framework.faces.entities.EntityRenderer;
 import framework.interaction.KeyListener;
@@ -24,11 +23,11 @@ public class WorldView implements KeyListener, MouseListener {
     public final HexMap cache;
     public final HashMap<Long, EntityRenderer> entities = new HashMap<Long, EntityRenderer>();
     public final ArrayList<Effect> effects = new ArrayList<Effect>();
-    public hexagon_maps state;
+    public HexagonApp state;
     private final HexMapRenderer renderer;
     private final EffectSetRenderer fx_renderer;
 
-    public WorldView(hexagon_maps state) {
+    public WorldView(HexagonApp state) {
         this.state = state;
         this.cache = new HexMap();
         this.renderer = new HexMapRenderer(state, this.cache);
@@ -50,11 +49,8 @@ public class WorldView implements KeyListener, MouseListener {
     }
 
     public boolean mouseClicked(PVector pos, int button) {
-        // FIXME: change the user's selection here
-        // send this click to the server?
-
         if (button == PApplet.LEFT) {
-            // use worldview to transform coordinate to tile coord
+            // select the tile that the user clicked
             HexCoord clicked = renderer.getHexCoordForPixel(pos.x, pos.y);
             renderer.setSelection(clicked);
         }

@@ -1,6 +1,6 @@
 package framework.interaction;
 
-import entrypoint.hexagon_maps;
+import entrypoint.HexagonApp;
 import processing.core.PConstants;
 import processing.core.PVector;
 
@@ -10,13 +10,15 @@ import java.util.ArrayList;
 * created by Faisal on 3/5/14 2:00 PM
 */
 public class Camera {
+    private static final float AUTOPAN_SPEED = 0.25f;
     public PVector focus = new PVector();
+    public PVector destFocus;
     boolean dragging = false;
     float scaling = 1.0f;
     ArrayList<MouseListener> listeners = new ArrayList<MouseListener>();
-    private hexagon_maps state;
+    private HexagonApp state;
 
-    public Camera(hexagon_maps state) {
+    public Camera(HexagonApp state) {
         this.state = state;
     }
 
@@ -28,8 +30,23 @@ public class Camera {
         state.translate(focus.x, focus.y);
         state.scale(scaling);
 
-        if (state.mousePressed && dragging) {
-            focus.add(PVector.sub(new PVector(state.mouseX, state.mouseY), new PVector(state.pmouseX, state.pmouseY)));
+        // if we have a destFocus, the user can't change the focus
+        if (destFocus != null) {
+            // attempt to move focus toward destfocus
+            focus.lerp(destFocus, AUTOPAN_SPEED);
+
+            // check if focus is close enough to destfocus
+            if (focus.dist(destFocus) <= 0.025) {
+                // in which case we can set focus to destfocus and clear destfocus
+                focus = destFocus;
+                destFocus = null;
+            }
+        }
+        else {
+            // no destfocus, the user can control the camera
+            if (state.mousePressed && dragging) {
+                focus.add(PVector.sub(new PVector(state.mouseX, state.mouseY), new PVector(state.pmouseX, state.pmouseY)));
+            }
         }
     }
 
@@ -72,7 +89,7 @@ public class Camera {
     }
 
     public void mouseScrolled(float amount) {
-        scaling += amount/20.0f;
+        scaling -= amount/20.0f;
 
         if (scaling <= 0.02f)
            scaling = 0.02f;

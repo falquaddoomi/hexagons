@@ -18,7 +18,7 @@ public class HexTile {
 
     public HexTile(int x, int y, int z) {
         coord = new HexCoord(x, y, z);
-        potential = (int)(Math.random() * 5000.0);
+        potential = (int)(Math.random() * 500.0);
     }
 
     public HexTile(HexCoord c) {

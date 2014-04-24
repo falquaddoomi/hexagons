@@ -3,15 +3,19 @@ package framework.network;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
+import domain.board.HexCoord;
 import domain.board.HexRegion;
 import domain.effects.Effect;
-import exchanges.MoveRequest;
+import domain.entities.EntityList;
+import domain.entities.Pylon;
+import exchanges.*;
 import framework.World;
 import framework.faces.entities.EntityFace;
-import processing.core.PVector;
+import notifies.EntDeathNotifyList;
 import support.Registry;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
@@ -22,6 +26,8 @@ public class HexServer extends Listener implements Runnable {
     final int TCP_PORT = 54555, UDP_PORT = 54777;
     private final World world;
 
+    // queue for storing players on whom we're waiting for login IDs
+    private final ArrayList<Connection> login_queue = new ArrayList<Connection>();
     // mapping of player IDs to players
     private final HashMap<Long, Player> players = new HashMap<Long, Player>();
     private long newPlayerID = 1;
@@ -46,11 +52,11 @@ public class HexServer extends Listener implements Runnable {
     }
 
     @Override
-    public void received(Connection connection, Object object) {
+    public void received(Connection connection, Object o) {
         // dispatch based on detected object type
-        if (object instanceof MoveRequest) {
+        if (o instanceof MoveRequest) {
             // activate the game map someplace, i guess?
-            MoveRequest click = (MoveRequest)object;
+            MoveRequest click = (MoveRequest)o;
 
             // send them an effect to signify that this worked, i guess
             Effect fx = new Effect();
@@ -59,13 +65,52 @@ public class HexServer extends Listener implements Runnable {
             connection.sendUDP(fx);
 
             // check if there's anything to move; if there is, move it
-            for (EntityFace e : world.entities.values()) {
+            for (EntityFace e : world.entity_mgr.getEntities().values()) {
                 if (e.get().coord.equals(click.from)) {
-                    // move that entity and dirty it
-                    e.get().coord = click.to;
-                    world.ents_dirty.entities.put(e.get().id, e.get());
+                    // set the entity's destination
+                    // it'll be auto-flushed as it moves
+                    e.get().dest = click.to;
                 }
             }
+        }
+        else if (o instanceof PlayerLoginResponse) {
+            // received from the client, contains what they think their ID is
+            PlayerLoginResponse response = (PlayerLoginResponse)o;
+            // what we'll eventually be sending to the client to clarify their login attempt
+            PlayerWelcomeResponse welcomeResponse = new PlayerWelcomeResponse();
+
+            if (players.containsKey(response.playerID) && players.get(response.playerID).getStatus() == Player.PlayerStatus.DISCONNECTED) {
+                // set this player's connection object to this object
+                // also flag the player as playing
+                Player thisPlayer = players.get(response.playerID);
+                thisPlayer.replaceConn(connection);
+                thisPlayer.setStatus(Player.PlayerStatus.IN_GAME);
+
+                System.out.format("Welcomed pre-known user w/ID %d\n", response.playerID);
+
+                // and tell the player that they connected
+                welcomeResponse.playerID = thisPlayer.getID();
+                connection.sendTCP(welcomeResponse);
+            }
+            else {
+                // just set them up as a new player
+                Player player = createPlayer(connection);
+                player.setStatus(Player.PlayerStatus.IN_GAME);
+
+                System.out.format("Created new user w/ID %d\n", player.getID());
+
+                synchronized (world) {
+                    // allow the world to set up the player
+                    Pylon ownedPylon = world.setupPlayer(player);
+                }
+
+                // and tell the player that they connected
+                welcomeResponse.playerID = player.getID();
+                connection.sendTCP(welcomeResponse);
+            }
+
+            // either way, we flush the state to the user
+            sendFullState(connection);
         }
     }
 
@@ -74,23 +119,21 @@ public class HexServer extends Listener implements Runnable {
         super.connected(connection);
         System.out.println("Connection received from " + connection);
 
-        // save this player object
-        long playerID = getNewPlayerID();
-        players.put(playerID, new Player(playerID, connection));
+        // ask this newly-connected player for their login info
+        connection.sendTCP(new PlayerLoginRequest());
+    }
 
-        // send user the map + all entities
-        synchronized (world) {
-            System.out.println("Entered synchronized block...");
-            HexRegion region = world.tiles.getMapAsRegion();
-            System.out.println("Acquired region, sending!");
-            connection.sendTCP(region);
-            System.out.printf("Sent %d tiles to %s\n", region.region.size(), connection);
+    @Override
+    public void disconnected(Connection connection) {
+        super.disconnected(connection);
 
-            connection.sendTCP(world.getEntityList());
-            System.out.printf("Sent %d entity notifications to %s\n", world.getEntityList().entities.size(), connection);
+        // find players who are associated w/this connection and set their status as disconnected
+        for (Player p : players.values()) {
+            if (p.getConn() != null && p.getConn().equals(connection)) {
+                p.setStatus(Player.PlayerStatus.DISCONNECTED);
+                p.releaseConn();
+            }
         }
-
-        System.out.println("Connection complete for " + connection);
     }
 
     @Override
@@ -106,25 +149,51 @@ public class HexServer extends Listener implements Runnable {
             }
 
             // also send out any queued entity creation events
-            if (world.ents_dirty.entities.size() > 0) {
-                System.out.printf("Sending out %d dirty entities\n", world.ents_dirty.entities.size());
+            EntityList dirty_ents = world.entity_mgr.getDirtyEnts();
+            if (dirty_ents.entities.size() > 0) {
+                // System.out.printf("Sending out %d dirty entities\n", dirty_ents.entities.size());
 
-                server.sendToAllTCP(world.ents_dirty);
-                world.ents_dirty.entities.clear();
+                server.sendToAllTCP(dirty_ents);
+                dirty_ents.entities.clear();
             }
 
             // finally send out any ent death notifications
-            if (world.ents_dead_dirty.ids.size() > 0) {
-                System.out.printf("Sending out %d dead entity notifications\n", world.ents_dead_dirty.ids.size());
+            EntDeathNotifyList dead_ents = world.entity_mgr.getInvalidatedEntIDs();
+            if (dead_ents.ids.size() > 0) {
+                // System.out.printf("Sending out %d dead entity notifications\n", dead_ents.ids.size());
 
-                server.sendToAllTCP(world.ents_dead_dirty);
-                world.ents_dead_dirty.ids.clear();
+                server.sendToAllTCP(dead_ents);
+                dead_ents.ids.clear();
             }
         }
     }
 
-    public long getNewPlayerID() {
+    protected Player createPlayer(Connection conn) {
+        long playerID = getNewPlayerID();
+        Player newPlayer = new Player(playerID, conn);
+
+        // add to the player list
+        players.put(newPlayerID, newPlayer);
+
+        return newPlayer;
+    }
+
+    protected long getNewPlayerID() {
         newPlayerID = (newPlayerID + 1) % Long.MAX_VALUE;
         return newPlayerID;
+    }
+
+    protected void sendFullState(Connection connection) {
+        // send user the map + all entities
+        synchronized (world) {
+            System.out.println("Entered synchronized block...");
+            HexRegion region = world.tiles.getMapAsRegion();
+            System.out.println("Acquired region, sending!");
+            connection.sendTCP(region);
+            System.out.printf("Sent %d tiles to %s\n", region.region.size(), connection);
+
+            connection.sendTCP(world.entity_mgr.getEntityList());
+            System.out.printf("Sent %d entity notifications to %s\n", world.entity_mgr.getEntityList().entities.size(), connection);
+        }
     }
 }

@@ -1,15 +1,16 @@
 package support;
 
 import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.serializers.TaggedFieldSerializer;
 import domain.board.HexCoord;
 import domain.board.HexRegion;
 import domain.board.HexTile;
 import domain.effects.Effect;
 import domain.entities.Entity;
 import domain.entities.EntityList;
+import domain.entities.Pylon;
 import domain.entities.Worker;
-import exchanges.MoveRequest;
+import exchanges.*;
+import notifies.EntDeathNotifyList;
 import processing.core.PVector;
 
 import java.util.ArrayList;
@@ -35,10 +36,18 @@ public class Registry {
 
         kryo.register(Entity.class);
         kryo.register(Worker.class);
+        kryo.register(Pylon.class);
         kryo.register(EntityList.class);
+        kryo.register(EntDeathNotifyList.class);
 
         // client actions/responses
         kryo.register(MoveRequest.class);
+        kryo.register(CameraPanRequest.class);
+        kryo.register(PlayerLoginRequest.class); // sent by server
+        kryo.register(PlayerLoginResponse.class); // sent by client
+        kryo.register(PlayerWelcomeResponse.class); // confirmation by server
+
+        // miscellaneous
         kryo.register(Effect.class);
     }
 }

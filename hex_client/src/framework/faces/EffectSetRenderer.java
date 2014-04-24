@@ -1,7 +1,7 @@
 package framework.faces;
 
 import domain.effects.Effect;
-import entrypoint.hexagon_maps;
+import entrypoint.HexagonApp;
 import framework.faces.board.HexMapRenderer;
 import processing.core.PConstants;
 import processing.core.PVector;
@@ -13,10 +13,10 @@ import java.util.Iterator;
  * created by Faisal on 3/11/14 2:13 PM
  */
 public class EffectSetRenderer {
-    protected final hexagon_maps state;
+    protected final HexagonApp state;
     protected final ArrayList<Effect> effects;
 
-    public EffectSetRenderer(hexagon_maps state, ArrayList<Effect> effects) {
+    public EffectSetRenderer(HexagonApp state, ArrayList<Effect> effects) {
         this.state = state;
         this.effects = effects;
     }

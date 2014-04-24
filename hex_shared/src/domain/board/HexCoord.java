@@ -1,5 +1,7 @@
 package domain.board;
 
+import processing.core.PApplet;
+
 /**
 * created by Faisal on 3/5/14 2:03 PM
 */
@@ -55,5 +57,31 @@ public class HexCoord {
             new HexCoord(x, y-1, z+1),
             new HexCoord(x-1, y, z+1)
         };
+    }
+
+    public int hexDist(HexCoord other) {
+        return PApplet.max(PApplet.abs(x - other.x), PApplet.abs(y - other.y), PApplet.abs(z - other.z));
+    }
+
+    /***
+     * Returns the HexCoord neighboring the current that's in the direction of the destination.
+     * @param dest the eventual target of our movement
+     * @return an adjacent tile that's closer to the target
+     */
+    public HexCoord inDirection(HexCoord dest) {
+        // this is a stupid way to do it, but iterate over each neighbor and return the one with the min dist to dest
+        // FIXME: we should somehow be able to identify the neighbor just based on the difference of this vs. dest
+        int min_dist = 9999;
+        HexCoord candidate = null;
+
+        for (HexCoord n : neighbors()) {
+            int dist = n.hexDist(dest);
+            if (dist < min_dist) {
+                min_dist = dist;
+                candidate = n;
+            }
+        }
+
+        return candidate;
     }
 }

@@ -1,30 +1,41 @@
 package entrypoint;
 
-import com.google.common.eventbus.EventBus;
 import framework.WorldView;
 import framework.interaction.Camera;
+import framework.interaction.HUD;
 import framework.interaction.Keyboard;
 import framework.network.HexClient;
 import processing.core.*;
 import processing.event.MouseEvent;
 
 import java.awt.event.KeyEvent;
+import java.util.prefs.Preferences;
 
-public class hexagon_maps extends PApplet {
+public class HexagonApp extends PApplet {
+    // game flags
+    public static boolean debug = true;
+
+    // reference objects
+    public Preferences prefs;
+
+    // manager objects
     public WorldView game;
-    public Keyboard keys = new Keyboard();
-    public Camera cam = new Camera(this);
+    public final Keyboard keys = new Keyboard();
+    public final Camera cam = new Camera(this);
+    public final HUD hud = new HUD(this);
     public HexClient client;
-    public boolean debug = false;
-
-    public EventBus bus = new EventBus();
+    // public final EventBus bus = new EventBus();
 
     public void setup() {
-        size(400, 400);
+        size(640, 480);
         noStroke();
         colorMode(PConstants.HSB);
+
+        // nab that settings object
+        prefs = Preferences.userRoot().node(this.getClass().getName());
+
         game = new WorldView(this);
-        client = new HexClient(game);
+        client = new HexClient(this, game);
 
         cam.focus(width/2, height/2);
         cam.addListener(game);
@@ -47,12 +58,7 @@ public class hexagon_maps extends PApplet {
         popMatrix();
 
         // output a bit of debugging text
-        if (debug) {
-            textAlign(PConstants.LEFT, PConstants.TOP);
-            fill(255);
-            text("Tiles: " + game.cache.map.size(), 5, 5);
-            text("Entities: " + game.entities.size(), 5, 12);
-        }
+        hud.drawHUD();
     }
 
     public void keyPressed() { keys.changed((key == PConstants.CODED)?(keyCode + 256):key, true); }
@@ -63,15 +69,21 @@ public class hexagon_maps extends PApplet {
                 debug = !debug;
         }
     }
-    public void mousePressed() { cam.mouseEvent(true, mouseButton); }
-    public void mouseReleased() { cam.mouseEvent(false, mouseButton); }
+    public void mousePressed() {
+        if (!hud.mouseEvent(true, mouseButton))
+            cam.mouseEvent(true, mouseButton);
+    }
+    public void mouseReleased() {
+        if (!hud.mouseEvent(false, mouseButton))
+            cam.mouseEvent(false, mouseButton);
+    }
 
     public void mouseWheel(MouseEvent event) {
         cam.mouseScrolled(event.getAmount());
     }
 
     static public void main(String[] passedArgs) {
-        String[] appletArgs = new String[] { "entrypoint.hexagon_maps" };
+        String[] appletArgs = new String[] { "entrypoint.HexagonApp" };
         if (passedArgs != null) {
             PApplet.main(PApplet.concat(appletArgs, passedArgs));
         } else {
